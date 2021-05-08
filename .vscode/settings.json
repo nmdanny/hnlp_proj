@@ -1,0 +1,15 @@
+{
+    "python.linting.mypyEnabled": true,
+    "python.linting.flake8Enabled": true,
+    "python.linting.pylintEnabled": false,
+    "python.formatting.provider": "black",
+    "editor.formatOnSave": true,
+    "python.venvPath": "~/.cache/pypoetry/virtualenvs",
+    "python.pythonPath": "/home/nmdanny/.cache/pypoetry/virtualenvs/hnlp-proj-TiVffxGf-py3.8/bin/python",
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.nosetestsEnabled": false
+}
