@@ -4,6 +4,12 @@ from typing import List
 ELEMENT_RE = re.compile("\\b([^,]+)", re.UNICODE)
 LAST_ELEMENT_RE = re.compile("\\s+ו([^,]+)", re.UNICODE)
 
+IMAGE_RE = re.compile("\\(צילום:.*\\)", re.UNICODE)
+
+
+def clean_texts(texts: List[str]) -> List[str]:
+    return [IMAGE_RE.sub("", text) for text in texts]
+
 
 def parse_joined_elements(authors: str) -> List[str]:
     """Given a string containing severals elements separated by asterisks,
