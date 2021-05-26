@@ -24,22 +24,20 @@ def combine_texts_by_author(df: pd.DataFrame) -> pd.DataFrame:
 
 def add_count_column(df: pd.DataFrame):
     """Given a set of corpuses (possibly combined or not) with a "text" field,
-    counts the number of tokens in each corpus and puts it into a "count" field"""
-    # df["count"] = df["text"].str.split().explode().groupby(level=0).count()
-    df["count"] = df["text"].str.split().str.len() + 1
+    counts the number of tokens in each corpus and puts it into a "count" field,
+    returning the newly updated data-frame."""
+    # add 1 to prevent division by 0 issues.
+    return df.assign(count=df["text"].str.split().str.len() + 1)
 
 
 def create_feature_matrix(
     df: pd.DataFrame,
     combine_by_author: bool = True,
-    features: Optional[Iterable[str]] = None,
-    num_features: Optional[int] = None,
+    features: Iterable[str] = None,
 ) -> pd.DataFrame:
     """Given a dataframe containing texts(under "text" column),
     and possibly authors(under "author" column), converts it to
-    a feature matrix for Burrows' Delta algorithm, using the given features,
-    unless features is None, in which case num_features will be used
-    to select the most frequent words
+    a feature matrix for Burrows' Delta algorithm, using the given features.
     """
 
     if "text" not in df.columns:
@@ -53,13 +51,7 @@ def create_feature_matrix(
             # The author index will only be used for retrieving Y_test
             df.set_index("author", inplace=True)
 
-    add_count_column(df)
-
-    if features is None:
-        assert num_features is not None
-        features = (
-            df["text"].str.split().explode("text").value_counts()[:num_features].index
-        )
+    df = add_count_column(df)
 
     # create feature matrix, a matrix of shape (num_authors, num_features),
     # containing term frequency of each feature word
@@ -72,3 +64,9 @@ def create_feature_matrix(
     feats = scaler.fit_transform(feats)
 
     return pd.DataFrame(feats, columns=vectorizer.get_feature_names(), index=df.index)
+
+
+def pick_most_common_words(df: pd.DataFrame, max_features: int) -> Iterable[str]:
+    if "text" not in df.columns:
+        raise ValueError("text column must be set")
+    return df["text"].str.split().explode("text").value_counts()[:max_features].index
