@@ -2,6 +2,7 @@ import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
 from hnlp_proj.utils import flip_hebrew_text
+from hnlp_proj.delta import add_count_column
 
 
 def plot_hebrew_barchart(values: pd.Series, num_entries: int, title: str):
@@ -14,5 +15,15 @@ def plot_hebrew_barchart(values: pd.Series, num_entries: int, title: str):
         .rename(columns={"index": "value"})
     )
     counts["value"] = counts["value"].apply(flip_hebrew_text)
-    sns.barplot(y=counts["value"], x=counts["count"]).set_title(title)
+    sns.barplot(y=counts["value"], x=counts["count"], orient="horizontal").set_title(
+        title
+    )
+    plt.show()
+
+
+def plot_corpus_sizes(df: pd.DataFrame, title: str = "Corpus sizes"):
+    df = df.copy()
+    add_count_column(df)
+
+    sns.barplot(y=df.index, x=df["count"], orient="horizontal").set_title(title)
     plt.show()
