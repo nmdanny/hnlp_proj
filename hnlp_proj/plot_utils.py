@@ -24,15 +24,13 @@ def plot_hebrew_barchart(values: pd.Series, num_entries: int, title: str):
 
 def plot_corpus_sizes(df: pd.DataFrame, title: str = "Corpus sizes"):
     df = add_count_column(df)
-
-    sns.barplot(y=df.index, x=df["count"], orient="horizontal").set_title(title)
+    y = [flip_hebrew_text(name) for name in df.index]
+    sns.barplot(y=y, x=df["count"], orient="horizontal").set_title(title)
     plt.show()
 
 
 def plot_feature_freqs(texts: pd.DataFrame, features: Iterable[str], title: str):
-    counts = (
-        texts["text"].str.split().explode().rename("count").value_counts().loc[features]
-    )
+    counts = texts["text"].explode().rename("count").value_counts().loc[features]
     counts = counts.reset_index().rename(columns={"index": "value"})
     counts["value"] = counts["value"].apply(flip_hebrew_text)
 

@@ -9,7 +9,7 @@ YNET_PATH = Path(__file__).parent / "../scrape/ynet.jl"
 ENG_PATH = Path(__file__).parent / "../data/victorian_large"
 
 
-def load_ynet(show_html_len_plot=True) -> pd.DataFrame:
+def load_ynet(show_html_len_plot: bool = True) -> pd.DataFrame:
 
     texts = pd.read_json(YNET_PATH, lines=True)
     lens = texts.text.apply(len)

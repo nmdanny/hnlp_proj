@@ -7,6 +7,7 @@ from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split, LeaveOneOut
+from itertools import chain
 
 
 def combine_texts_by_author(df: pd.DataFrame) -> pd.DataFrame:
@@ -19,7 +20,11 @@ def combine_texts_by_author(df: pd.DataFrame) -> pd.DataFrame:
     if "author" not in df.columns:
         raise ValueError("author column must be set")
 
-    return df.groupby("author")["text"].apply("\n\n".join).to_frame(name="text")
+    return (
+        df.groupby("author")["text"]
+        .apply(lambda lists: list(chain(*lists)))
+        .to_frame(name="text")
+    )
 
 
 def add_count_column(df: pd.DataFrame):
@@ -27,7 +32,7 @@ def add_count_column(df: pd.DataFrame):
     counts the number of tokens in each corpus and puts it into a "count" field,
     returning the newly updated data-frame."""
     # add 1 to prevent division by 0 issues.
-    return df.assign(count=df["text"].str.split().str.len() + 1)
+    return df.assign(count=df["text"].apply(lambda ls: len(ls) + 1))
 
 
 def create_feature_matrix(
@@ -58,8 +63,11 @@ def create_feature_matrix(
 
     # TODO: maybe use different tokenization(change the one used for "count"
     #       calculation too)
-    vectorizer = CountVectorizer(vocabulary=features, tokenizer=str.split)
-    feats = vectorizer.fit_transform(df["text"]) / df["count"].to_numpy()[:, np.newaxis]
+    vectorizer = CountVectorizer(vocabulary=features, analyzer=lambda x: x)
+    feats = (
+        vectorizer.fit_transform(df["text"]).todense()
+        / df["count"].to_numpy()[:, np.newaxis]
+    )
     scaler = StandardScaler(with_mean=True, with_std=True)
     feats = scaler.fit_transform(feats)
 
@@ -69,4 +77,4 @@ def create_feature_matrix(
 def pick_most_common_words(df: pd.DataFrame, max_features: int) -> Iterable[str]:
     if "text" not in df.columns:
         raise ValueError("text column must be set")
-    return df["text"].str.split().explode("text").value_counts()[:max_features].index
+    return df["text"].explode("text").value_counts()[:max_features].index
