@@ -17,19 +17,22 @@ class Processing(Enum):
 
 def process_data(df: pd.DataFrame, option: Processing = Processing.Raw) -> pd.DataFrame:
     if option == Processing.SplitTokenize:
-        df["text"] = df["text"].str.split()
+        df = df.assign(text=df["text"].str.split())
     elif option == Processing.HebTokenize:
-        df["text"] = df["text"].apply(heb_tokenize)
+        df = df.assign(text=df["text"].apply(heb_tokenize))
     elif option == Processing.HebYap:
-        df["text"] = df["text"].apply(heb_yap)
-    return df
+        df = df.assign(text=df["text"].apply(heb_yap))
+    else:
+        df = df.copy()
+    df["count"] = df["text"].apply(len)
+    return df[df["count"] > 0]
 
 
 HEB_TOKENIZER = HebTokenizer()
 
 
 def heb_tokenize(text: str) -> List[str]:
-    return [token for _, token in HEB_TOKENIZER.tokenize(text)]
+    return [token for _, token in HEB_TOKENIZER.tokenize(text) if token]
 
 
 def heb_yap(text: str) -> List[str]:

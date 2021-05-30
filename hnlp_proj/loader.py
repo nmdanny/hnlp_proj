@@ -36,3 +36,9 @@ def load_eng_test() -> pd.DataFrame:
             entries.append({"authors": [author], "title": title, "text": text.lower()})
 
     return pd.DataFrame.from_records(entries)
+
+
+def load_debug() -> pd.DataFrame:
+    return pd.DataFrame(
+        {"author": ["A", "A", "B"], "text": ["שלום עולם.", "ביי עולם.", "מה זה"]}
+    )
