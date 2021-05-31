@@ -27,12 +27,11 @@ def plot_corpus_sizes(df: pd.DataFrame, title: str = "Corpus sizes"):
     plt.show()
 
 
-def plot_feature_freqs(texts: pd.DataFrame, features: Iterable[str], title: str):
-    counts = texts["text"].explode().rename("count").value_counts().loc[features]
-    counts = counts.reset_index().rename(columns={"index": "value"})
-    counts["value"] = counts["value"].apply(flip_hebrew_text)
-
-    sns.barplot(y=counts["value"], x=counts["count"], orient="horizontal").set_title(
-        title
-    )
+def plot_feature_freqs(
+    counts: pd.DataFrame, title: str, count_normalized: bool = False
+):
+    counts = counts.copy()
+    counts.columns = [flip_hebrew_text(col) for col in counts.columns]
+    counts.index = [flip_hebrew_text(name) for name in counts.index]
+    counts.T.plot(kind="barh", stacked=True, title=title)
     plt.show()
