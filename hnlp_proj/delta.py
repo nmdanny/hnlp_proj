@@ -121,7 +121,7 @@ class DeltaTransformer(BaseEstimator, TransformerMixin):
         # separately
         X_feat, counts = create_feature_matrix(
             X,
-            combine_by_author=True,
+            combine_by_author=False,
             features=self.features,
             scaler_use_mean=self.center_features,
             scaler_use_std=self.standardize_features,
