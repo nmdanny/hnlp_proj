@@ -1,3 +1,6 @@
+data/
+hnlp_proj/stanza_resources
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
