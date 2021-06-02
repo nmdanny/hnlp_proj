@@ -5,13 +5,16 @@ import matplotlib.pyplot as plt
 import io
 import re
 from pathlib import Path
+import pickle
+import bz2
 
-YNET_PATH = Path(__file__).parent / "../scrape/ynet.jl"
+YNET_PATH = Path(__file__).parent / "../data/ynet.jl"
 
 ENG_PATH = Path(__file__).parent / "../data/victorian_large"
 
 EVEN_YEHUDA_PATH = Path(__file__).parent / "../data/public_domain_dump-master.zip"
 
+YNET_STANZA_PICKLE = Path(__file__).parent / "../data/ynet.pickle.bz2"
 
 def combine_author_corpora(df: pd.DataFrame) -> pd.DataFrame:
     """Combines all texts(by concatenating along with newlines)
@@ -24,7 +27,8 @@ def combine_author_corpora(df: pd.DataFrame) -> pd.DataFrame:
     return df.groupby("author")["text"].apply("\n\n".join).reset_index()
 
 
-def load_ynet(show_html_len_plot: bool = True) -> pd.DataFrame:
+
+def load_ynet(show_html_len_plot: bool = False, with_pickle=False) -> pd.DataFrame:
 
     texts = pd.read_json(YNET_PATH, lines=True)
     lens = texts.text.apply(len)
@@ -41,6 +45,15 @@ def load_ynet(show_html_len_plot: bool = True) -> pd.DataFrame:
     texts.text = texts.text.apply(combine_texts)
     texts.text = texts.text.str.strip()
     texts = texts[texts.text.astype(bool)]
+
+    if with_pickle:
+        if not YNET_STANZA_PICKLE.exists():
+            raise ValueError("pickle file for ynet dataset isn't available")
+        with bz2.open(YNET_STANZA_PICKLE, 'rb') as pickle_f:
+            docs = pickle.load(pickle_f)
+            assert len(docs) == len(texts), f"Number of documents in pickle file({len(docs)}) doesn't match DF length({len(texts)}) "
+            texts["docs"] = docs
+
     return texts
 
 
