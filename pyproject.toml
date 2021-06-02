@@ -16,6 +16,8 @@ seaborn = "^0.11.1"
 #yap-wrapper = { git = "https://github.com/nmdanny/YAP-Wrapper.git", branch = "packaging"}
 yap-wrapper = { path = "YAP_Wrapper", develop = true}
 
+stanza-batch = "^0.2.2"
+
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
 jupyter = "^1.0.0"
@@ -25,7 +27,11 @@ flake8 = "^3.9.1"
 isort = "^5.8.0"
 black = "^21.5b0"
 rope = "^0.19.0"
+poethepoet = "^0.10.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poe.tasks]
+force-cuda11 = "python -m pip install torch==1.8.1+cu111 torchvision==0.9.1+cu111 torchaudio===0.8.1 -f https://download.pytorch.org/whl/torch_stable.html"
