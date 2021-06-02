@@ -39,6 +39,8 @@ def load_ynet(show_html_len_plot: bool = True) -> pd.DataFrame:
 
     texts.text = texts.text.apply(clean_texts)
     texts.text = texts.text.apply(combine_texts)
+    texts.text = texts.text.str.strip()
+    texts = texts[texts.text.astype(bool)]
     return texts
 
 
@@ -82,5 +84,7 @@ def load_ben_yehuda() -> pd.DataFrame:
             catalog: pd.DataFrame = pd.read_csv(csv)
             catalog["authors"] = catalog.authors.apply(lambda authors: [authors])
             catalog.rename(columns={"genre": "category"}, inplace=True)
-            catalog["text"] = catalog.path.apply(load_text)
+            catalog.text = catalog.path.apply(load_text)
+            catalog.text = catalog.text.str.strip()
+            catalog = catalog[catalog.text.astype(bool)]
             return catalog
