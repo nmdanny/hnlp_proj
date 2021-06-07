@@ -17,6 +17,7 @@ seaborn = "^0.11.1"
 yap-wrapper = { path = "YAP_Wrapper", develop = true}
 
 stanza-batch = "^0.2.2"
+toma = "^1.1.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

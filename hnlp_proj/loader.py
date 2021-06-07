@@ -12,9 +12,14 @@ YNET_PATH = Path(__file__).parent / "../data/ynet.jl"
 
 ENG_PATH = Path(__file__).parent / "../data/victorian_large"
 
-EVEN_YEHUDA_PATH = Path(__file__).parent / "../data/public_domain_dump-master.zip"
+BEN_YEHUDA_PATH = Path(__file__).parent / "../data/public_domain_dump-master.zip"
 
 YNET_STANZA_PICKLE = Path(__file__).parent / "../data/ynet.pickle.bz2"
+
+BEN_YEHUDA_STANZA_PICKLE = (
+    Path(__file__).parent / "../data/public_domain_dump-master.pickle.bz2"
+)
+
 
 def combine_author_corpora(df: pd.DataFrame) -> pd.DataFrame:
     """Combines all texts(by concatenating along with newlines)
@@ -25,7 +30,6 @@ def combine_author_corpora(df: pd.DataFrame) -> pd.DataFrame:
     if "author" not in df.columns:
         raise ValueError("author column missing")
     return df.groupby("author")["text"].apply("\n\n".join).reset_index()
-
 
 
 def load_ynet(show_html_len_plot: bool = False, with_pickle=False) -> pd.DataFrame:
@@ -46,15 +50,18 @@ def load_ynet(show_html_len_plot: bool = False, with_pickle=False) -> pd.DataFra
     texts.text = texts.text.str.strip()
     texts = texts[texts.text.astype(bool)]
 
-    if with_pickle:
-        if not YNET_STANZA_PICKLE.exists():
-            raise ValueError("pickle file for ynet dataset isn't available")
-        with bz2.open(YNET_STANZA_PICKLE, 'rb') as pickle_f:
-            docs = pickle.load(pickle_f)
-            assert len(docs) == len(texts), f"Number of documents in pickle file({len(docs)}) doesn't match DF length({len(texts)}) "
-            texts["docs"] = docs
-
     return texts
+
+
+def attach_pickle(texts: pd.DataFrame, pickle_path: Path):
+    if not pickle_path.exists():
+        raise ValueError(f"pickle file {pickle_path} doesn't exist")
+    with bz2.open(pickle_path, "rb") as pickle_f:
+        docs = pickle.load(pickle_f)
+        assert len(docs) == len(
+            texts
+        ), f"Number of documents in pickle file({len(docs)}) doesn't match DF length({len(texts)}) "
+        texts["docs"] = docs
 
 
 def load_eng_test() -> pd.DataFrame:
@@ -85,7 +92,7 @@ def load_ben_yehuda() -> pd.DataFrame:
     import zipfile
 
     ZIP_ROOT_FOLDER = "public_domain_dump-master"
-    with zipfile.ZipFile(EVEN_YEHUDA_PATH, "r") as zipf:
+    with zipfile.ZipFile(BEN_YEHUDA_PATH, "r") as zipf:
 
         def load_text(path: str) -> str:
             with zipf.open(f"{ZIP_ROOT_FOLDER}/txt_stripped{path}.txt", "r") as f:
@@ -97,7 +104,7 @@ def load_ben_yehuda() -> pd.DataFrame:
             catalog: pd.DataFrame = pd.read_csv(csv)
             catalog["authors"] = catalog.authors.apply(lambda authors: [authors])
             catalog.rename(columns={"genre": "category"}, inplace=True)
-            catalog.text = catalog.path.apply(load_text)
+            catalog["text"] = catalog.path.apply(load_text)
             catalog.text = catalog.text.str.strip()
             catalog = catalog[catalog.text.astype(bool)]
             return catalog

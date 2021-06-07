@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from enum import IntEnum
 from yap_wrapper import YapApi, HebTokenizer
-from typing import Iterable, List
+from typing import Iterable, List, Mapping, Any
 from pathlib import Path
 import stanza
 from functools import lru_cache, partial
@@ -24,7 +24,9 @@ class Processing(IntEnum):
 
 
 @lru_cache(maxsize=None)
-def get_pipeline(processing: Processing) -> stanza.Pipeline:
+def get_stanza_pipeline(
+    processing: Processing, **kwargs: Mapping[str, Any]
+) -> stanza.Pipeline:
     processors = ""
     if processing == Processing.StanzaPOS:
         processors = "tokenize,mwt,pos"
@@ -34,7 +36,9 @@ def get_pipeline(processing: Processing) -> stanza.Pipeline:
         raise ValueError("Invalid processing argument", processing)
     RESOURCE_DIR.mkdir(parents=True, exist_ok=True)
     stanza.download("he", model_dir=str(RESOURCE_DIR))
-    return stanza.Pipeline(lang="he", dir=str(RESOURCE_DIR), processors=processors)
+    return stanza.Pipeline(
+        lang="he", dir=str(RESOURCE_DIR), processors=processors, **kwargs
+    )
 
 
 def process_data(df: pd.DataFrame, option: Processing = Processing.Raw) -> pd.DataFrame:
@@ -47,7 +51,7 @@ def process_data(df: pd.DataFrame, option: Processing = Processing.Raw) -> pd.Da
     elif option == Processing.HebYap:
         df = df.assign(text=df["text"].apply(heb_yap))
     else:
-        pipeline = get_pipeline(option)
+        pipeline = get_stanza_pipeline(option)
         df = df.assign(docs=df["text"].apply(pipeline))
     df["count"] = df["text"].apply(len)
     return df[df["count"] > 0]
