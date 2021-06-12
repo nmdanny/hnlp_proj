@@ -13,11 +13,13 @@ stanza = "^1.2"
 scikit-learn = "^0.24.2"
 matplotlib = "^3.4.2"
 seaborn = "^0.11.1"
-#yap-wrapper = { git = "https://github.com/nmdanny/YAP-Wrapper.git", branch = "packaging"}
+#yap-wrapper = { git = "https://github.com/nmdanny/YAP-Wrapper.git", branch = "minor-improvements"}
 yap-wrapper = { path = "YAP_Wrapper", develop = true}
 
 stanza-batch = "^0.2.2"
 toma = "^1.1.0"
+pyarrow = "^4.0.1"
+pandas-profiling = {extras = ["notebook"], version = "^3.0.0"}
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

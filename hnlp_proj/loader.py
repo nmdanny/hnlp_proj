@@ -1,3 +1,4 @@
+from ctypes import Union
 import pandas as pd
 from hnlp_proj.utils import clean_texts, combine_texts
 import seaborn as sns
@@ -32,7 +33,7 @@ def combine_author_corpora(df: pd.DataFrame) -> pd.DataFrame:
     return df.groupby("author")["text"].apply("\n\n".join).reset_index()
 
 
-def load_ynet(show_html_len_plot: bool = False, with_pickle=False) -> pd.DataFrame:
+def load_ynet(show_html_len_plot: bool = False) -> pd.DataFrame:
 
     texts = pd.read_json(YNET_PATH, lines=True)
     lens = texts.text.apply(len)

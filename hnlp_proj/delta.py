@@ -1,35 +1,37 @@
-from typing import Optional, Iterable, Sequence, Tuple
+from typing import Any, Callable, Dict, Optional, Iterable, Sequence, Tuple
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.preprocessing import StandardScaler
 from itertools import chain
-import operator
-
-from hnlp_proj.processing import Processing, process_data
+from hnlp_proj.processing import FeatureType, extract_feature_lists
 
 
 def combine_texts_by_author(df: pd.DataFrame) -> pd.DataFrame:
-    """Given a set of texts with a "text", "count" and "author" fields, combines the rows
-    by authors, returning the df indexed by author.
+    """Given a set of texts with an "author", "text" and possibly "stanza_doc" fields,
+    combines the rows by authors, returning the df indexed by author.
     """
     if "text" not in df.columns:
         raise ValueError("text column must be set")
     if "author" not in df.columns:
         raise ValueError("author column must be set")
-    if "count" not in df.columns:
-        raise ValueError("count column must be set")
 
-    return df.groupby("author")[["text", "count"]].agg(
-        {"text": lambda lists: list(chain(*lists)), "count": "sum"}
-    )
+    agg: Dict[str, Any] = {}
+
+    keys = ["text"]
+    agg["text"] = "\n\n".join
+    if "stanza_doc" in df.columns:
+        agg["stanza_doc"] = lambda lists: list(chain(*lists))
+        keys.append("stanza_doc")
+
+    return df.groupby(level="author")[keys].agg(agg)
 
 
 def create_feature_matrix(
     df: pd.DataFrame,
-    combine_by_author: bool = True,
-    features: Iterable[str] = None,
+    feature_column: str,
+    features: Optional[Iterable[str]] = None,
     scaler_use_mean: bool = True,
     scaler_use_std: bool = True,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -39,28 +41,21 @@ def create_feature_matrix(
     the counts of each feature.
     """
 
-    if "text" not in df.columns:
-        raise ValueError("text column must be set")
+    if feature_column not in df.columns:
+        raise ValueError(f"{feature_column} column must be set")
 
-    if combine_by_author:
-        df = combine_texts_by_author(df)
-        print("combine by author")
-    else:
-        print("not combine by author")
-        # If we're not combining texts, this is probably the evaluation set
-        if "author" in df.columns:
-            # The author index will only be used for retrieving Y_test
-            df.set_index("author", inplace=True)
-    assert "count" in df.columns, "DF must have count column"
+    if "author" in df.columns:
+        # The author index will only be used for retrieving Y_test
+        df.set_index("author", inplace=True)
+
+    total_count_vector = df[feature_column].apply(len).to_numpy()
 
     # create feature matrix, a matrix of shape (num_authors, num_features),
-    # containing term frequency of each feature word
+    # containing term frequency of each feature(token/lemma/tag etc..)
 
-    # TODO: maybe use different tokenization(change the one used for "count"
-    #       calculation too)
     vectorizer = CountVectorizer(vocabulary=features, analyzer=lambda x: x)
-    counts = vectorizer.fit_transform(df["text"]).todense()
-    feats = counts / df["count"].to_numpy()[:, np.newaxis]
+    counts = vectorizer.fit_transform(df[feature_column]).todense()
+    feats = counts / total_count_vector[:, np.newaxis]
     scaler = StandardScaler(with_mean=scaler_use_mean, with_std=scaler_use_std)
     feats = scaler.fit_transform(feats)
 
@@ -71,11 +66,11 @@ def create_feature_matrix(
 
 
 def pick_most_common_words(
-    df: pd.DataFrame, max_features: Optional[int] = None
+    df: pd.DataFrame, feature_column: str, max_features: Optional[int] = None
 ) -> Sequence[str]:
-    if "text" not in df.columns:
-        raise ValueError("text column must be set")
-    ret = df["text"].explode("text").value_counts()[:max_features]
+    if feature_column not in df.columns:
+        raise ValueError(f"{feature_column} column must be set")
+    ret = df[feature_column].explode(feature_column).value_counts()[:max_features]
     if max_features:
         ret = ret[:max_features]
     return ret.index
@@ -86,7 +81,7 @@ class DeltaTransformer(BaseEstimator, TransformerMixin):
         self,
         features: Optional[Sequence[str]] = None,
         num_features: Optional[int] = None,
-        processing: Processing = Processing.HebTokenize,
+        processing: FeatureType = FeatureType.HebTokenize,
         center_features: bool = True,
         standardize_features: bool = True,
     ) -> None:
@@ -98,30 +93,34 @@ class DeltaTransformer(BaseEstimator, TransformerMixin):
         self.last_transformed_count: Optional[pd.DataFrame] = None
         super().__init__()
 
-    def fit(self, X: pd.DataFrame, y: Optional[pd.DataFrame] = None):
+    def fit(
+        self, X: pd.DataFrame, y: Optional[pd.DataFrame] = None
+    ) -> "DeltaTransformer":
         if self.features is not None and self.num_features:
             self.features = self.features[: self.num_features]
+        elif self.features is not None:
+            pass
         else:
-            # learn features
-            X = process_data(X, self.processing)
-            self.features = pick_most_common_words(X, self.num_features)
+            if self.num_features is None:
+                raise ValueError("Either features or num_features must be specified")
+
+            # pick the most common features
+            X = extract_feature_lists(X, self.processing)
+            self.features = pick_most_common_words(
+                X,
+                feature_column=self.processing.col_name(),
+                max_features=self.num_features,
+            )
         assert (
             self.features is not None and len(self.features) > 0
         ), "Features should be present by now"
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-        if "text" not in X.columns:
-            raise ValueError("text column missing in X")
-
-        X = process_data(X, self.processing)
-
-        # If 'y' is present, we must be training, so combine corpuses by their authors
-        # Otherwise, we're transforming evaluation/prediction data, so treat each text
-        # separately
+        X = extract_feature_lists(X, self.processing)
         X_feat, counts = create_feature_matrix(
             X,
-            combine_by_author=False,
+            feature_column=self.processing.col_name(),
             features=self.features,
             scaler_use_mean=self.center_features,
             scaler_use_std=self.standardize_features,

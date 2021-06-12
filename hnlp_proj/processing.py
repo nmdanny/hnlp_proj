@@ -1,10 +1,11 @@
 import pandas as pd
 import numpy as np
-from enum import IntEnum
+from enum import auto, Enum
 from yap_wrapper import YapApi, HebTokenizer
-from typing import Iterable, List, Mapping, Any
+from typing import Iterable, List, Mapping, Any, Tuple
 from pathlib import Path
 import stanza
+from stanza.models.common.doc import Document
 from functools import lru_cache, partial
 
 
@@ -14,26 +15,38 @@ YAP_API = YapApi(YAP_IP)
 RESOURCE_DIR = Path(__file__).parent / "stanza_resources"
 
 
-class Processing(IntEnum):
-    Raw = 0
-    SplitTokenize = 1
-    HebTokenize = 2
-    HebYap = 3
-    StanzaPOS = 4
-    StanzaLemma = 5
+class FeatureType(Enum):
+    """Defines features that can be used in our pipeline"""
+
+    SplitTokenize = auto()
+    HebTokenize = auto()
+    YapLemmas = auto()
+    StanzaPOS = auto()
+    StanzaLemma = auto()
+
+    def col_name(self) -> str:
+        if self in (FeatureType.SplitTokenize, FeatureType.HebTokenize):
+            return "tokens"
+        if self in (FeatureType.YapLemmas, FeatureType.StanzaLemma):
+            return "lemmas"
+        if self == FeatureType.StanzaPOS:
+            return "pos"
+        raise ValueError("Impossible, invalid processing value", self)
 
 
 @lru_cache(maxsize=None)
 def get_stanza_pipeline(
-    processing: Processing, **kwargs: Mapping[str, Any]
+    feature_type: FeatureType, **kwargs: Mapping[str, Any]
 ) -> stanza.Pipeline:
     processors = ""
-    if processing == Processing.StanzaPOS:
+    if feature_type == FeatureType.StanzaPOS:
         processors = "tokenize,mwt,pos"
-    elif processing == Processing.StanzaLemma:
+    elif feature_type == FeatureType.StanzaLemma:
         processors = "tokenize,mwt,pos,lemma"
     else:
-        raise ValueError("Invalid processing argument", processing)
+        raise ValueError(
+            "Invalid processing argument, must be for stanza", feature_type
+        )
     RESOURCE_DIR.mkdir(parents=True, exist_ok=True)
     stanza.download("he", model_dir=str(RESOURCE_DIR))
     return stanza.Pipeline(
@@ -41,20 +54,22 @@ def get_stanza_pipeline(
     )
 
 
-def process_data(df: pd.DataFrame, option: Processing = Processing.Raw) -> pd.DataFrame:
-    if option == Processing.Raw:
-        df = df.copy()
-    elif option == Processing.SplitTokenize:
-        df = df.assign(text=df["text"].str.split())
-    elif option == Processing.HebTokenize:
-        df = df.assign(text=df["text"].apply(heb_tokenize))
-    elif option == Processing.HebYap:
-        df = df.assign(text=df["text"].apply(heb_yap))
-    else:
-        pipeline = get_stanza_pipeline(option)
-        df = df.assign(docs=df["text"].apply(pipeline))
-    df["count"] = df["text"].apply(len)
-    return df[df["count"] > 0]
+def extract_feature_lists(df: pd.DataFrame, feature_type: FeatureType) -> pd.DataFrame:
+    """Given a dataframe containing 'text' and possibly 'stanza_doc' columns,
+    adds the appropriate feature column(list of elements)
+    in a newly returned data-frame."""
+    if feature_type == FeatureType.SplitTokenize:
+        df = df.assign(tokens=df["text"].str.split())
+    elif feature_type == FeatureType.HebTokenize:
+        df = df.assign(tokens=df["text"].apply(heb_tokenize))
+    elif feature_type == FeatureType.YapLemmas:
+        df = df.assign(lemmas=df["text"].apply(extract_yap_lemmas))
+    elif feature_type == FeatureType.StanzaLemma:
+        df = df.assign(lemmas=df["stanza_doc"].apply(extract_stanza_lemmas))
+    elif feature_type == FeatureType.StanzaPOS:
+        df = df.assign(pos=df["stanza_doc"].apply(extract_stanza_pos))
+
+    return df
 
 
 HEB_TOKENIZER = HebTokenizer()
@@ -64,6 +79,16 @@ def heb_tokenize(text: str) -> List[str]:
     return [token for _, token in HEB_TOKENIZER.tokenize(text) if token]
 
 
-def heb_yap(text: str) -> List[str]:
+def extract_yap_lemmas(text: str) -> List[str]:
     results = YAP_API.run(text)
     return list(results.dep_tree["lemma"])
+
+
+def extract_stanza_lemmas(sentences: List[Any]) -> Iterable[str]:
+    doc = Document(sentences)
+    return [word.lemma for word in doc.iter_words()]
+
+
+def extract_stanza_pos(sentences: List[Any]) -> Iterable[Tuple[str, str]]:
+    doc = Document(sentences)
+    return [(word.upos, word.xpos) for word in doc.iter_words()]
