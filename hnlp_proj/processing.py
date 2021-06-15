@@ -75,20 +75,20 @@ def extract_feature_lists(df: pd.DataFrame, feature_type: FeatureType) -> pd.Dat
 HEB_TOKENIZER = HebTokenizer()
 
 
-def heb_tokenize(text: str) -> List[str]:
-    return [token for _, token in HEB_TOKENIZER.tokenize(text) if token]
+def heb_tokenize(text: str) -> str:
+    return " ".join(token for _, token in HEB_TOKENIZER.tokenize(text) if token)
 
 
-def extract_yap_lemmas(text: str) -> List[str]:
+def extract_yap_lemmas(text: str) -> str:
     results = YAP_API.run(text)
-    return list(results.dep_tree["lemma"])
+    return " ".join(results.dep_tree["lemma"])
 
 
-def extract_stanza_lemmas(sentences: List[Any]) -> Iterable[str]:
+def extract_stanza_lemmas(sentences: List[Any]) -> str:
     doc = Document(sentences)
-    return [word.lemma for word in doc.iter_words()]
+    return " ".join(word.lemma for word in doc.iter_words() if word.lemma)
 
 
-def extract_stanza_pos(sentences: List[Any]) -> Iterable[Tuple[str, str]]:
+def extract_stanza_pos(sentences: List[Any]) -> str:
     doc = Document(sentences)
-    return [(word.upos, word.xpos) for word in doc.iter_words()]
+    return " ".join(f"{word.upos}_{word.xpos}" for word in doc.iter_words())

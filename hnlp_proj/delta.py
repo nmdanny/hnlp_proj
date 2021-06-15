@@ -1,4 +1,15 @@
-from typing import Any, Callable, Dict, Optional, Iterable, Sequence, Tuple
+from dataclasses import dataclass, field
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Literal,
+    Optional,
+    Iterable,
+    Sequence,
+    Tuple,
+    Union,
+)
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -28,10 +39,25 @@ def combine_texts_by_author(df: pd.DataFrame) -> pd.DataFrame:
     return df.groupby(level="author")[keys].agg(agg)
 
 
+@dataclass
+class VectorizerOptions:
+    ngram_range: Tuple[int, int] = field(default=(1, 1))
+    analyzer: Union[Literal["word"], Literal["char"]] = field(default="word")
+
+    def create_vectorizer(self, **kwargs: Dict[str, Any]) -> CountVectorizer:
+        vectorizer = CountVectorizer(
+            token_pattern=r"(?u)\S+",
+            ngram_range=self.ngram_range,
+            analyzer=self.analyzer,
+            **kwargs,
+        )
+        return vectorizer
+
+
 def create_feature_matrix(
     df: pd.DataFrame,
     feature_column: str,
-    features: Optional[Iterable[str]] = None,
+    vectorizer: CountVectorizer,
     scaler_use_mean: bool = True,
     scaler_use_std: bool = True,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -53,8 +79,7 @@ def create_feature_matrix(
     # create feature matrix, a matrix of shape (num_authors, num_features),
     # containing term frequency of each feature(token/lemma/tag etc..)
 
-    vectorizer = CountVectorizer(vocabulary=features, analyzer=lambda x: x)
-    counts = vectorizer.fit_transform(df[feature_column]).todense()
+    counts = vectorizer.transform(df[feature_column]).todense()
     feats = counts / total_count_vector[:, np.newaxis]
     scaler = StandardScaler(with_mean=scaler_use_mean, with_std=scaler_use_std)
     feats = scaler.fit_transform(feats)
@@ -65,55 +90,45 @@ def create_feature_matrix(
     )
 
 
-def pick_most_common_words(
-    df: pd.DataFrame, feature_column: str, max_features: Optional[int] = None
-) -> Sequence[str]:
-    if feature_column not in df.columns:
-        raise ValueError(f"{feature_column} column must be set")
-    ret = df[feature_column].explode(feature_column).value_counts()[:max_features]
-    if max_features:
-        ret = ret[:max_features]
-    return ret.index
-
-
 class DeltaTransformer(BaseEstimator, TransformerMixin):
     def __init__(
         self,
+        vectorizer_options: VectorizerOptions,
         features: Optional[Sequence[str]] = None,
         num_features: Optional[int] = None,
         processing: FeatureType = FeatureType.HebTokenize,
         center_features: bool = True,
         standardize_features: bool = True,
     ) -> None:
+        self.vectorizer_options = vectorizer_options
         self.features = features
         self.num_features = num_features
         self.processing = processing
         self.center_features = center_features
         self.standardize_features = standardize_features
         self.last_transformed_count: Optional[pd.DataFrame] = None
+        self.vectorizer: Optional[CountVectorizer] = None
         super().__init__()
 
     def fit(
         self, X: pd.DataFrame, y: Optional[pd.DataFrame] = None
     ) -> "DeltaTransformer":
-        if self.features is not None and self.num_features:
-            self.features = self.features[: self.num_features]
-        elif self.features is not None:
-            pass
-        else:
-            if self.num_features is None:
-                raise ValueError("Either features or num_features must be specified")
-
-            # pick the most common features
-            X = extract_feature_lists(X, self.processing)
-            self.features = pick_most_common_words(
-                X,
-                feature_column=self.processing.col_name(),
-                max_features=self.num_features,
+        vec_args: Dict[str, Any] = {}
+        if self.features:
+            self.features = (
+                self.features[: self.num_features]
+                if self.num_features
+                else self.features[:]
             )
-        assert (
-            self.features is not None and len(self.features) > 0
-        ), "Features should be present by now"
+            vec_args["vocabulary"] = self.features
+        elif self.num_features:
+            vec_args["max_features"] = self.num_features
+        X = extract_feature_lists(X, self.processing)
+        self.vectorizer = self.vectorizer_options.create_vectorizer(**vec_args).fit(
+            X[self.processing.col_name()]
+        )
+        self.features = self.vectorizer.get_feature_names()
+
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
@@ -121,7 +136,7 @@ class DeltaTransformer(BaseEstimator, TransformerMixin):
         X_feat, counts = create_feature_matrix(
             X,
             feature_column=self.processing.col_name(),
-            features=self.features,
+            vectorizer=self.vectorizer,
             scaler_use_mean=self.center_features,
             scaler_use_std=self.standardize_features,
         )
