@@ -31,6 +31,7 @@ from hnlp_proj.plot_utils import (
     plot_corpus_sizes,
     plot_feature_freqs,
     plot_text_length_histogram_per_author,
+    plot_text_length_histogram_per_category,
     plot_total_subcorpus_length_per_author,
 )
 from hnlp_proj.delta import DeltaTransformer, combine_texts_by_author, VectorizerOptions
@@ -45,11 +46,11 @@ DATASET_TO_PATH = {
     "benyehuda-diaries": "data/ben_yehuda/זכרונות ויומנים.pickle.bz2",
 }
 
-DATASET = "benyehuda-diaries"
+DATASET = "ynet"
 
-texts = pd.read_pickle(DATASET_TO_PATH[DATASET])
-texts.head(5)
-
+# texts = pd.read_pickle(DATASET_TO_PATH[DATASET])
+# texts.head(5)
+texts = load_ben_yehuda()
 
 # %%
 # Plotting frequency of categories
@@ -76,10 +77,11 @@ if len(one_author_df) != len(texts):
         f"Out of {len(texts)} articles, {len(one_author_df)} of them were written by exactly 1 author"
     )
 
+plot_text_length_histogram_per_category(one_author_df, binrange=(0, 1e4))
 
 # %%
 # choose the most prolific authors
-NUM_AUTHORS = 5
+NUM_AUTHORS = 10
 chosen_authors = one_author_df.author.value_counts()[:NUM_AUTHORS].index
 
 
@@ -121,3 +123,14 @@ plot_feature_freqs(counts, title="Chosen features and their counts within each a
 
 # %%
 counts
+
+# %%
+
+ix = 1337
+print("כותרת ראשית:", texts.loc[ix, "main_title"])
+print("קטגוריה:", texts.loc[ix, "category"], end="\t")
+print("עורכים:", texts.loc[ix, "authors"][0])
+print("\n", texts.loc[ix, "text"])
+
+# %%
+plot_text_length_histogram_per_category(one_author_df)

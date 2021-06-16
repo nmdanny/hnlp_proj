@@ -26,7 +26,19 @@ def plot_text_length_histogram_per_author(df: pd.DataFrame):
     df = df.set_index("author", drop=False).assign(lengths=df["text"].apply(len))
     df["author"] = [flip_hebrew_text(name) for name in df.author]
     ax = sns.histplot(data=df, hue="author", x="lengths", multiple="stack")
-    ax.set_title("Text length histogram")
+    ax.set_title("Text length histogram per author")
+    ax.set(xlabel="Text length(characters)")
+    plt.show()
+
+
+def plot_text_length_histogram_per_category(df: pd.DataFrame, **plot_kwargs):
+    df = df.set_index("category", drop=False)
+    df["lengths"] = df["text"].str.len()
+    df["category"] = [flip_hebrew_text(name) for name in df.category]
+    ax = sns.histplot(
+        data=df, hue="category", x="lengths", multiple="stack", **plot_kwargs
+    )
+    ax.set_title("Text length histogram per category")
     ax.set(xlabel="Text length(characters)")
     plt.show()
 
