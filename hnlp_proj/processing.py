@@ -56,10 +56,10 @@ def get_stanza_pipeline(
 
 def extract_feature_lists(df: pd.DataFrame, feature_type: FeatureType) -> pd.DataFrame:
     """Given a dataframe containing 'text' and possibly 'stanza_doc' columns,
-    adds the appropriate feature column(list of elements)
+    adds the appropriate feature column(all elements, joined by spaces)
     in a newly returned data-frame."""
     if feature_type == FeatureType.SplitTokenize:
-        df = df.assign(tokens=df["text"].str.split())
+        df = df.assign(tokens=df["text"])
     elif feature_type == FeatureType.HebTokenize:
         df = df.assign(tokens=df["text"].apply(heb_tokenize))
     elif feature_type == FeatureType.YapLemmas:
