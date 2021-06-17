@@ -2,6 +2,7 @@
 # To add a new markdown cell, type '# %% [markdown]'
 # %%
 from IPython import get_ipython
+from sklearn.feature_extraction.text import CountVectorizer
 
 # %%
 get_ipython().run_line_magic("load_ext", "autoreload")
@@ -48,9 +49,9 @@ DATASET_TO_PATH = {
 
 DATASET = "ynet"
 
-# texts = pd.read_pickle(DATASET_TO_PATH[DATASET])
+texts = pd.read_pickle(DATASET_TO_PATH[DATASET])
 # texts.head(5)
-texts = load_ben_yehuda()
+# texts = load_ben_yehuda()
 
 # %%
 # Plotting frequency of categories
@@ -81,7 +82,7 @@ plot_text_length_histogram_per_category(one_author_df, binrange=(0, 1e4))
 
 # %%
 # choose the most prolific authors
-NUM_AUTHORS = 10
+NUM_AUTHORS = 2
 chosen_authors = one_author_df.author.value_counts()[:NUM_AUTHORS].index
 
 
@@ -94,7 +95,7 @@ plot_total_subcorpus_length_per_author(chosen_author_texts)
 
 # %%
 NUM_FEATURES = 5
-PROCESSING = FeatureType.StanzaLemma
+PROCESSING = FeatureType.SplitTokenize
 
 # split texts
 # train, test = train_test_split(one_author_df, test_size=0.2, random_state=RANDOM_STATE, stratify=one_author_df["author"])
@@ -115,22 +116,26 @@ pipeline = make_pipeline(
     KNeighborsClassifier(n_neighbors=1, metric="manhattan"),
 )
 
-_freqs = pipeline.steps[0][1].fit_transform(train, train.index)
+freqs = pipeline.steps[0][1].fit_transform(train, train.index)
 features = pipeline.steps[0][1].get_params()["features"]
 counts = pipeline.steps[0][1].last_transformed_count
-plot_feature_freqs(counts, title="Chosen features and their counts within each author")
+# plot_feature_freqs(counts, title="Chosen features and their counts within each author")
 
 
 # %%
-counts
+from sklearn.preprocessing import StandardScaler
+
+StandardScaler().fit_transform(counts.to_numpy())
 
 # %%
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 
-ix = 1337
-print("כותרת ראשית:", texts.loc[ix, "main_title"])
-print("קטגוריה:", texts.loc[ix, "category"], end="\t")
-print("עורכים:", texts.loc[ix, "authors"][0])
-print("\n", texts.loc[ix, "text"])
+# vec = TfidfVectorizer(use_idf=False, norm='l1', max_features=3)
+vec = CountVectorizer()
 
-# %%
-plot_text_length_histogram_per_category(one_author_df)
+docs = pd.DataFrame([{"text": "AA BB CC ZZ"}, {"text": "AA AA BB"}])
+total_counts = docs["text"].str.split().apply(len).to_numpy()
+
+counts = vec.fit_transform(docs["text"]) / total_counts[:, np.newaxis]
+
+pd.DataFrame(counts, columns=vec.get_feature_names(), index=docs.index)

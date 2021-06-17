@@ -1,13 +1,13 @@
 from hnlp_proj.delta import DeltaTransformer, combine_texts_by_author
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Union, Tuple
 import pandas as pd
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
 from sklearn.model_selection import train_test_split
 from tqdm.auto import tqdm
 from datetime import datetime
-
-import sqlite3
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 
 class Evaluation:
@@ -18,6 +18,7 @@ class Evaluation:
         data: pd.DataFrame,
         combine_by_authors: bool,
         tag: str = "",
+        random_state: int = 42,
     ):
         """Initialize the evaluation with train and test sets"""
         self.data = data.set_index("author", drop=False)
@@ -25,9 +26,10 @@ class Evaluation:
         self.combine_by_authors = combine_by_authors
 
         self.counts: List[int] = []
-        self.pipelines: List[Pipeline] = []
+        self.pipelines: List[Tuple[Pipeline, bool]] = []
         self.pipeline_descriptions: List[Union[str, Dict[str, Any]]] = []
         self.results: List[Dict[str, Any]] = []
+        self.random_state = random_state
 
         self.tag = tag
 
@@ -37,10 +39,14 @@ class Evaluation:
         return self
 
     def add_pipeline(
-        self, pipeline: Pipeline, description: Union[str, Dict[str, str]]
+        self,
+        pipeline: Pipeline,
+        description: Union[str, Dict[str, str]],
+        combine_by_author: bool = True,
     ) -> "Evaluation":
-        self.pipelines.append(pipeline)
+        self.pipelines.append((pipeline, combine_by_author))
         self.pipeline_descriptions.append(description)
+
         return self
 
     def evaluate(self):
@@ -49,12 +55,14 @@ class Evaluation:
 
         test_num = 1
         for n_authors in tqdm(self.counts, desc="Number of authors"):
-            for pipeline, description in tqdm(
+            for (pipeline, combine_by_author), description in tqdm(
                 zip(self.pipelines, self.pipeline_descriptions),
                 desc="Pipelines",
                 total=len(self.pipelines),
             ):
-                self.evaluate_case(test_num, n_authors, pipeline, description)
+                self.evaluate_case(
+                    test_num, n_authors, pipeline, combine_by_author, description
+                )
                 test_num += 1
 
     def evaluate_case(
@@ -62,6 +70,7 @@ class Evaluation:
         test_num: int,
         n_authors: int,
         pipeline: Pipeline,
+        combine_by_author: bool,
         description: Dict[str, Any],
     ):
         chosen_authors = self.authors_counts[:n_authors].index
@@ -69,11 +78,11 @@ class Evaluation:
         selected_train, selected_test = train_test_split(
             selected_data,
             test_size=0.2,
-            random_state=42,
+            random_state=self.random_state,
             stratify=selected_data["author"],
         )
 
-        if self.combine_by_authors:
+        if combine_by_author:
             selected_train = combine_texts_by_author(selected_train)
 
         fit_start = datetime.now()
@@ -139,3 +148,10 @@ class Evaluation:
 
     def get_result_df(self) -> pd.DataFrame:
         return pd.DataFrame.from_records(self.results)
+
+
+def plot_eval_results(df, metric: str = "accuracy"):
+    ax = sns.scatterplot(data=df, x="n_authors", y=metric, hue="pipeline_desc")
+    ax.set_title(f"Plot of {metric} as function of author count, per model")
+    ax.legend(loc="upper right")
+    plt.show()
