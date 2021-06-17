@@ -74,7 +74,7 @@ def create_feature_matrix(
         # The author index will only be used for retrieving Y_test
         df.set_index("author", inplace=True)
 
-    total_count_vector = df[feature_column].apply(len).to_numpy()
+    total_count_vector = df[feature_column].str.split().apply(len).to_numpy()
 
     # create feature matrix, a matrix of shape (num_authors, num_features),
     # containing term frequency of each feature(token/lemma/tag etc..)
