@@ -9,7 +9,7 @@ from pathlib import Path
 import pickle
 import bz2
 
-YNET_PATH = Path(__file__).parent / "../data/ynet.jl"
+YNET_PATH = Path(__file__).parent / "../data/ynet.jsonl"
 
 ENG_PATH = Path(__file__).parent / "../data/victorian_large"
 
